@@ -8,11 +8,12 @@ IG_BASE = f"https://graph.instagram.com/{settings.META_API_VERSION}"
 
 async def exchange_code_for_token(code: str) -> dict:
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{FB_BASE}/oauth/access_token",
-            params={
-                "client_id": settings.META_APP_ID,
-                "client_secret": settings.META_APP_SECRET,
+        response = await client.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
+                "client_id": settings.INSTAGRAM_APP_ID,
+                "client_secret": settings.INSTAGRAM_APP_SECRET,
+                "grant_type": "authorization_code",
                 "redirect_uri": settings.INSTAGRAM_REDIRECT_URI,
                 "code": code,
             },
@@ -24,12 +25,12 @@ async def exchange_code_for_token(code: str) -> dict:
 async def get_long_lived_token(short_lived_token: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"{FB_BASE}/oauth/access_token",
+            f"{IG_BASE}/access_token",
             params={
-                "grant_type": "fb_exchange_token",
-                "client_id": settings.META_APP_ID,
-                "client_secret": settings.META_APP_SECRET,
-                "fb_exchange_token": short_lived_token,
+                "grant_type": "ig_exchange_token",
+                "client_id": settings.INSTAGRAM_APP_ID,
+                "client_secret": settings.INSTAGRAM_APP_SECRET,
+                "access_token": short_lived_token,
             },
         )
         response.raise_for_status()
@@ -119,7 +120,7 @@ async def reply_to_comment(comment_id: str, message: str, access_token: str) -> 
 async def subscribe_ig_account_webhooks(ig_user_id: str, access_token: str) -> None:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{FB_BASE}/{ig_user_id}/subscribed_apps",
+            f"{IG_BASE}/{ig_user_id}/subscribed_apps",
             params={
                 "subscribed_fields": "comments,messages",
                 "access_token": access_token,
