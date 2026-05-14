@@ -21,7 +21,7 @@ def run_async(coro):
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def send_dm_task(self, ig_user_id: str, recipient_id: str, message: str, access_token: str, log_id: str = None):
-    from app.services.meta_api import send_instagram_dm, get_page_access_token
+    from app.services.meta_api import send_instagram_dm
     db = SessionLocal()
     try:
         account = db.query(InstagramAccount).filter(
@@ -30,8 +30,8 @@ def send_dm_task(self, ig_user_id: str, recipient_id: str, message: str, access_
         ).first()
         if not account or not account.page_id:
             raise ValueError(f"No active account with page_id for ig_user {ig_user_id}")
-        page_token = run_async(get_page_access_token(account.page_id, account.access_token))
-        run_async(send_instagram_dm(account.page_id, recipient_id, message, page_token))
+        # account.access_token is the page access token (stored during Facebook Login connect)
+        run_async(send_instagram_dm(account.page_id, recipient_id, message, account.access_token))
         if log_id:
             log = db.query(AutomationLog).filter(AutomationLog.id == uuid.UUID(log_id)).first()
             if log:
@@ -186,23 +186,6 @@ def _process_dm_event(db, payload: dict):
 
 @celery_app.task
 def refresh_tokens_task():
-    from datetime import datetime, timedelta
-    from app.services.meta_api import get_long_lived_token
-
-    db = SessionLocal()
-    try:
-        soon_expiring = db.query(InstagramAccount).filter(
-            InstagramAccount.is_active == True,
-            InstagramAccount.token_expires_at <= datetime.utcnow() + timedelta(days=7),
-        ).all()
-
-        for account in soon_expiring:
-            try:
-                data = run_async(get_long_lived_token(account.access_token))
-                account.access_token = data["access_token"]
-                account.token_expires_at = datetime.utcnow() + timedelta(seconds=data.get("expires_in", 5183944))
-                db.commit()
-            except Exception:
-                pass
-    finally:
-        db.close()
+    # Page access tokens from Facebook Login (derived from long-lived user tokens) do not expire.
+    # No refresh needed for current token strategy.
+    pass

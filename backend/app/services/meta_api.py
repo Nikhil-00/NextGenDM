@@ -7,13 +7,13 @@ IG_BASE = f"https://graph.instagram.com/{settings.META_API_VERSION}"
 
 
 async def exchange_code_for_token(code: str) -> dict:
+    """Exchange Facebook OAuth code for short-lived user access token."""
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.instagram.com/oauth/access_token",
-            data={
+        response = await client.get(
+            f"{FB_BASE}/oauth/access_token",
+            params={
                 "client_id": settings.INSTAGRAM_APP_ID,
                 "client_secret": settings.INSTAGRAM_APP_SECRET,
-                "grant_type": "authorization_code",
                 "redirect_uri": settings.INSTAGRAM_REDIRECT_URI,
                 "code": code,
             },
@@ -23,14 +23,15 @@ async def exchange_code_for_token(code: str) -> dict:
 
 
 async def get_long_lived_token(short_lived_token: str) -> dict:
+    """Exchange short-lived Facebook user token for long-lived token (60 days)."""
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"{IG_BASE}/access_token",
+            f"{FB_BASE}/oauth/access_token",
             params={
-                "grant_type": "ig_exchange_token",
+                "grant_type": "fb_exchange_token",
                 "client_id": settings.INSTAGRAM_APP_ID,
                 "client_secret": settings.INSTAGRAM_APP_SECRET,
-                "access_token": short_lived_token,
+                "fb_exchange_token": short_lived_token,
             },
         )
         response.raise_for_status()
@@ -136,7 +137,7 @@ async def subscribe_page_webhooks(page_id: str, page_access_token: str) -> None:
         response = await client.post(
             f"{FB_BASE}/{page_id}/subscribed_apps",
             params={
-                "subscribed_fields": "feed,messages",
+                "subscribed_fields": "feed,messages,instagram_manage_messages,instagram_manage_comments",
                 "access_token": page_access_token,
             },
         )

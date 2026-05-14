@@ -16,15 +16,37 @@ FOLLOWERS_CACHE_TTL = 1800  # 30 minutes
 
 
 async def connect_instagram_account(user_id: uuid.UUID, code: str, db: Session) -> InstagramAccount:
+    # Exchange code → short-lived Facebook user token
     token_data = await meta_api.exchange_code_for_token(code)
     short_token = token_data["access_token"]
-    ig_user_id = str(token_data["user_id"])
 
+    # Exchange → long-lived user token (60 days)
     long_token_data = await meta_api.get_long_lived_token(short_token)
     long_token = long_token_data["access_token"]
     expires_in = long_token_data.get("expires_in", 5183944)
 
-    ig_user = await meta_api.get_instagram_user(long_token)
+    # Get Facebook pages with linked Instagram business accounts
+    pages = await meta_api.get_facebook_pages(long_token)
+    if not pages:
+        raise Exception("No Facebook pages found. Link your Instagram account to a Facebook page first.")
+
+    # Use first page that has an Instagram business account
+    selected_page = None
+    for page in pages:
+        if page.get("instagram_business_account"):
+            selected_page = page
+            break
+
+    if not selected_page:
+        raise Exception("No Instagram business account linked to your Facebook pages.")
+
+    page_id = selected_page["id"]
+    page_name = selected_page.get("name", "")
+    page_access_token = selected_page["access_token"]
+    ig_biz = selected_page["instagram_business_account"]
+    ig_user_id = str(ig_biz["id"])
+    ig_username = ig_biz.get("username", "unknown")
+    ig_profile_pic = ig_biz.get("profile_picture_url")
 
     existing = db.query(InstagramAccount).filter(
         InstagramAccount.instagram_user_id == ig_user_id,
@@ -32,15 +54,17 @@ async def connect_instagram_account(user_id: uuid.UUID, code: str, db: Session) 
     ).first()
 
     if existing:
-        existing.access_token = long_token
+        existing.access_token = page_access_token
         existing.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-        existing.username = ig_user.get("username", existing.username)
-        existing.profile_picture_url = ig_user.get("profile_picture_url")
+        existing.username = ig_username
+        existing.profile_picture_url = ig_profile_pic
+        existing.page_id = page_id
+        existing.page_name = page_name
         existing.is_active = True
         db.commit()
         db.refresh(existing)
         try:
-            await meta_api.subscribe_ig_account_webhooks(ig_user_id, long_token)
+            await meta_api.subscribe_page_webhooks(page_id, page_access_token)
         except Exception:
             pass
         return existing
@@ -48,18 +72,18 @@ async def connect_instagram_account(user_id: uuid.UUID, code: str, db: Session) 
     account = InstagramAccount(
         user_id=user_id,
         instagram_user_id=ig_user_id,
-        username=ig_user.get("username", "unknown"),
-        profile_picture_url=ig_user.get("profile_picture_url"),
-        access_token=long_token,
+        username=ig_username,
+        profile_picture_url=ig_profile_pic,
+        access_token=page_access_token,
         token_expires_at=datetime.utcnow() + timedelta(seconds=expires_in),
-        page_id=None,
-        page_name=ig_user.get("name"),
+        page_id=page_id,
+        page_name=page_name,
     )
     db.add(account)
     db.commit()
     db.refresh(account)
     try:
-        await meta_api.subscribe_ig_account_webhooks(ig_user_id, long_token)
+        await meta_api.subscribe_page_webhooks(page_id, page_access_token)
     except Exception:
         pass
     return account

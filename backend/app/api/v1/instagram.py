@@ -18,9 +18,8 @@ from app.services import meta_api
 router = APIRouter(prefix="/instagram", tags=["instagram"])
 
 OAUTH_SCOPES = (
-    "instagram_business_basic,"
-    "instagram_business_manage_messages,"
-    "instagram_business_manage_comments"
+    "instagram_basic,instagram_manage_messages,instagram_manage_comments,"
+    "pages_show_list,pages_messaging,pages_manage_metadata"
 )
 
 
@@ -33,7 +32,7 @@ def initiate_oauth(current_user: User = Depends(get_current_user)):
         "response_type": "code",
         "state": str(current_user.id),
     })
-    oauth_url = f"https://api.instagram.com/oauth/authorize?{params}"
+    oauth_url = f"https://www.facebook.com/dialog/oauth?{params}"
     return {"oauth_url": oauth_url}
 
 
