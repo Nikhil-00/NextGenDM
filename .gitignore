@@ -24,7 +24,8 @@ dist/
 
 # Logs
 *.log
-logs/
+/logs/
+/backend/logs/
 
 # OS
 .DS_Store

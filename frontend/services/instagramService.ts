@@ -1,5 +1,5 @@
 import api from "./api";
-import type { InstagramAccount } from "@/types";
+import type { InstagramAccount, InstagramMedia } from "@/types";
 
 export const instagramService = {
   async getConnectUrl(): Promise<string> {

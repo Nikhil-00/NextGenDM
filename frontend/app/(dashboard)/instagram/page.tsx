@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { AccountCard } from "@/components/instagram/AccountCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { instagramService } from "@/services/instagramService";
 
-export default function InstagramPage() {
+function InstagramPageInner() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [showTokenInput, setShowTokenInput] = useState(false);
@@ -140,5 +140,13 @@ export default function InstagramPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function InstagramPage() {
+  return (
+    <Suspense>
+      <InstagramPageInner />
+    </Suspense>
   );
 }
